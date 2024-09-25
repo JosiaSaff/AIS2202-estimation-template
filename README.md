@@ -35,7 +35,8 @@ Call CMake with `-DCMAKE_TOOLCHAIN_FILE=[path to vcpkg]/scripts/buildsystems/vcp
 
 Add optional features by listing them with `-DVCPKG_MANIFEST_FEATURES=feature1;feature2`
 
-Note, however, that under MinGW you'll need to specify the vcpkg triplet:
+## Additional steps for MinGW on Windows
+Under MinGW you'll need to specify the vcpkg triplet:
 ```bash
 -DVCPKG_TARGET_TRIPLET=x64-mingw-[static|dynamic]  # For both of these lines, choose either 'static' or 'dynamic'.
 -DVCPKG_HOST_TRIPLET=x64-mingw-[static|dynamic]    # This is needed only if MSVC cannot be found. 
