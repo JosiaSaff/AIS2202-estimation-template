@@ -23,10 +23,10 @@ The dataset contains orientation, FTS and IMU measurements from three different 
 Dataset:<br>
 [Accelerometer and Force/Torque Sensor Measurements for Parameter and State Estimation of an Unknown Robot End Effector](https://zenodo.org/records/11096791)
 
-Paper 1: Parameter estimation<br>
+Paper: Parameter estimation<br>
 [Bias Estimation and Gravity Compensation For Force-Torque Sensors](https://citeseerx.ist.psu.edu/document?doi=900c5de4ac54cf28df816584264fa0de71c4817f)
 
-Paper 2: State estimation<br>
+Paper: State estimation<br>
 [A Linear Discrete Kalman Filter to Estimate the Contact Wrench of an Unknown Robot End Effector](https://ieeexplore.ieee.org/document/10671273)
 
 # How to setup vcpkg (in manifest mode)
