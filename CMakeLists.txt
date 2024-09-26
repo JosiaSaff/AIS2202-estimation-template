@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.29)
+cmake_minimum_required(VERSION 3.27)
 project(AIS2202-estimation-template)
 
 set(CMAKE_CXX_STANDARD 20)
