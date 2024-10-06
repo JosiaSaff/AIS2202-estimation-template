@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.29)
-project(AIS4104-assignments)
+project(AIS2202-assignments-template)
 
 set(CMAKE_CXX_STANDARD 20)
 
