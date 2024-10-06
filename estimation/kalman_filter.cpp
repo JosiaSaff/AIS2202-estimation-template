@@ -9,6 +9,29 @@ using namespace estimation;
 kalman_filter::kalman_filter(){
 
 }
+//ispiration source: https://github.com/hmartiro/kalman-cpp/blob/master/kalman.cpp
+
+void kalman_filter::update(const Eigen::VectorXd& y) {
+
+    //if(!initialized)
+    //    throw std::runtime_error("Filter is not initialized!");
+
+    x_hat_new = aMatrix * x_hat;
+    pMatrix = aMatrix * pMatrix* aMatrix.transpose() + Q;
+    K = P*C.transpose()*(C*P*C.transpose() + R).inverse();
+    x_hat_new += K * (y - C*x_hat_new);
+    P = (I - K*C)*P;
+    x_hat = x_hat_new;
+
+    t += dt;
+}
+
+void kalman_filter::update(const Eigen::VectorXd& y, double dt, const Eigen::MatrixXd A) {
+
+    this->A = A;
+    this->dt = dt;
+    update(y);
+}
 
 
 //The kalman filter addresses the general problem of trying to estimate the
