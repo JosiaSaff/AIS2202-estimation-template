@@ -41,18 +41,17 @@ double estimationOfMass(Eigen::MatrixXd &gravityVecs, Eigen::MatrixXd &forceVecs
 }
 
 
-Eigen::VectorXd massCenterEstimation(const Eigen::MatrixXd &gravityVecg, const Eigen::MatrixXd &tourqeVec, double mStar){
-    return (1/mStar)*(gravityVecg.transpose() * gravityVecg).inverse() * gravityVecg.transpose() * tourqeVec;
+Eigen::VectorXd massCenterEstimation(Eigen::MatrixXd &gravityVecg, Eigen::VectorXd &tourqeVec, double mStar){
+    return ((gravityVecg.transpose() * gravityVecg).inverse() * gravityVecg.transpose() * tourqeVec)/mStar;
 }
 
 
 Eigen::VectorXd estimateForceBias(const Eigen::VectorXd &measurements, int rows) {
     int columns = 6;
-    Eigen::MatrixXd forceBias = Eigen::VectorXd::Zero(1,columns);
-    //can potentially do a  double for-loop
+    Eigen::VectorXd forceBias = Eigen::VectorXd::Zero(columns);
 
     for (int i = 0; i < columns; i++) {
-        forceBias(0, i) = measurements(i) / rows;
+        forceBias(i) = measurements(i) / rows;
     }
     return forceBias;
 }
@@ -150,28 +149,28 @@ int main() {
     std::cout << "The mass estimate is: " << massEstimate << std::endl;
 
 
-    /* //Type problem
-    Eigen::MatrixXd measurementsOfForce(row, 3);  // Resize vector to have 'row' elements
+     //Type problem
+    Eigen::VectorXd measurementsOfForce(6);  // Resize vector to have 'row' elements
     for (int i = 1; i < row; ++i) {
         //Eigen::VectorXd measurement(6);
         measurementsOfForce(0) += std::stod(data[i][0]);
         measurementsOfForce(1) += std::stod(data[i][1]);
         measurementsOfForce(2) += std::stod(data[i][2]);
-
+        //These are for torque
         measurementsOfForce(3) += std::stod(data[i][3]);
         measurementsOfForce(4) += std::stod(data[i][4]);
         measurementsOfForce(5) += std::stod(data[i][5]);
-    }*/
+    }
 
-    //std::cout << "measurements of force matrix is: " << measurementsOfForce << std::endl;
+    std::cout << "measurements of force matrix is: " << measurementsOfForce << std::endl;
 
     //std::cout << "" << std::endl;
-    //std::cout << "" << std::endl;
+    std::cout << "" << std::endl;
 
     //this does not work for some reason{
-    //Eigen::VectorXd forceBias = estimateForceBias(measurementsOfForce, row);
+    Eigen::VectorXd forceBias = estimateForceBias(measurementsOfForce, row);
 
-    //std::cout << "The force bias is: " << forceBias << std::endl; }
+    std::cout << "The force bias is: " << forceBias << std::endl; //}
 
 
 
@@ -179,16 +178,47 @@ int main() {
 
 
     Eigen::MatrixXd torqueVecs(row, 3);
+    Eigen::VectorXd stackedTorques(3);
+    Eigen::MatrixXd stackedGravMatrices(3,3);
+
     //  Eigen:  : M  a    t r i x X  d gravityVec(row, 3);
+    //The matrix is not initialized at 0 for some reason
+
+    for (int i = 0; i < 3; ++i){
+        stackedTorques(i) = 0.0;
+        for (int j = 0; j < 3; ++j){
+            stackedGravMatrices(i,j) = 0.0;
+
+        }
+    }
+    std::cout << "stacked graxMatrices:" << stackedGravMatrices << std::endl;
+
+
+
 
     for (int i = 1; i < row; ++i) {
-        torqueVecs(i,0) = std::stod(data[i][3]);  // Collect columns 4-6
-        torqueVecs(i,1) = std::stod(data[i][4]);
-        torqueVecs(i,2) = std::stod(data[i][5]);
-        //gravityVec.row(i) << std::stod(data[i][9]), std::stod(data[i][10]), std::stod(data[i][11]);  // Collect columns 10-12
+        stackedTorques(0) += std::stod(data[i][3]);  // Collect columns 4-6
+        stackedTorques(1) += std::stod(data[i][4]);
+        stackedTorques(2) += std::stod(data[i][5]);
+
+
+        stackedGravMatrices(0,1) += std::stod(data[i][10]);
+        stackedGravMatrices(2,0) += std::stod(data[i][11]);
+        stackedGravMatrices(1,2) += std::stod(data[i][9]);
     }
 
-    auto massCenter = massCenterEstimation(gravityVecs, torqueVecs, massEstimate);
+    //I have to make sure the indexes are mirrored
+
+    stackedGravMatrices(1,0) = - stackedGravMatrices(0,1); //this is for the secoudnd
+    stackedGravMatrices(0,2) = - stackedGravMatrices(2,0); // this is for the first
+    stackedGravMatrices(2,1) = - stackedGravMatrices(1,2); //This is cenrtantly for the third
+
+
+    std::cout << "stacked torques:" << stackedTorques << std::endl;
+    std::cout << "stacked gravMatrices:" << stackedGravMatrices << std::endl;
+
+
+    auto massCenter = massCenterEstimation(stackedGravMatrices, stackedTorques, massEstimate);
 
     std::cout << "" << std::endl;
     std::cout << "The calculated mass center is: " << massCenter << ", with the mass estimate of :" << massEstimate << "." << std::endl;
