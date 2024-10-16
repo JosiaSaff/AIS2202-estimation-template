@@ -1,21 +1,22 @@
-%% For the last task.
+clc, close all, clear all;
+% For the last task.
 
 % Load the FTS and IMU data
-FTS_data = readtable('..\datasets\0-calibration_fts-accel.csv');
-steady_state_accel = readtable('..\datasets\0-steady-state_accel.csv');
-steady_state_wrench = readtable('..\datasets\0-steady-state_wrench.csv');
+FTS_data = readtable('datasets/0-calibration_fts-accel.csv');
+steady_state_accel = readtable('datasets\0-steady-state_accel.csv');
+steady_state_wrench = readtable('datasets\0-steady-state_wrench.csv');
 
-baseline_accel = readtable('..\datasets\2-vibrations_accel.csv');
-baseline_orientations = readtable('..\datasets\2-vibrations_orientations.csv');
-baseline_wrench = readtable('..\datasets\1-baseline_wrench.csv');
+baseline_accel = readtable('datasets\2-vibrations_accel.csv');
+baseline_orientations = readtable('datasets\2-vibrations_orientations.csv');
+baseline_wrench = readtable('datasets\1-baseline_wrench.csv');
 
-vibrations_accel = readtable('..\datasets\2-vibrations_accel.csv');
-vibrations_wrench = readtable('..\datasets\2-vibrations_wrench.csv');
-vibrations_orientations = readtable('..\datasets\2-vibrations_orientations.csv');
+vibrations_accel = readtable('datasets\2-vibrations_accel.csv');
+vibrations_wrench = readtable('datasets\2-vibrations_wrench.csv');
+vibrations_orientations = readtable('datasets\2-vibrations_orientations.csv');
 
-vib_contact_accel = readtable('..\datasets\3-vibrations-contact_accel.csv');
-vib_contact_wrench = readtable('..\datasets\3-vibrations-contact_wrench.csv');
-vib_contact_orientations = readtable('..\datasets\3-vibrations-contact_orientations.csv');
+vib_contact_accel = readtable('datasets\3-vibrations-contact_accel.csv');
+vib_contact_wrench = readtable('datasets\3-vibrations-contact_wrench.csv');
+vib_contact_orientations = readtable('datasets\3-vibrations-contact_orientations.csv');
 
 % Align datasets by their timestamps (assuming they all have a "t" column for time)
 % Find the earliest timestamp and synchronize each dataset accordingly
@@ -42,8 +43,8 @@ gy = FTS_data.gy;
 gz = FTS_data.gz;
 
 % Estimate mass and mass center (from the paper, eq. (23))
-estimated_mass = 0.932;         %  kg
-        estimatedMassCenter = [0, 0, 0.044];    % m (estimated)
+estimated_mass = 0.932308;  %      kg
+mass_center = [0, 0, 0.044];  % m (estimated)
 
 % Compute gravity compensation vector (from eq. (12) in the paper)
 g_w = [0; 0; -9.81];  % Gravity vector in world frame
@@ -53,10 +54,8 @@ R_fs = [0, 0, -1; -1, 0, 0; 0, 1, 0];
 
 g_s = R_fs * g_w;  % Gravity in sensor frame
 
-%Equation (12) in paper 3
-% correct:
-% matrix is going to be [[m_estimated * gs]; [(m_estimated * gs) crossMultiplyed estimatedMassCenter]]
-Vg = [estimated_mass * g_s; cross(estimatedMassCenter', estimated_mass * g_s')'];
+%Equation (12)
+Vg = [estimated_mass * g_s; cross(mass_center', estimated_mass * g_s')'];
 
 
 % Gravity vector Vg
