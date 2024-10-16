@@ -171,7 +171,7 @@ Eigen::Vector3d calculateTorqueBias(const Eigen::MatrixXd &torqueMeasurements, i
 
         //Type problem
         Eigen::VectorXd measurementsOfForce(3);  // Resize vector to have 'row' elements
-        for (int i = 1; i < row; ++i) {
+        for (int i = 2; i < row+1; ++i) {
             measurementsOfForce(0) += std::stod(data[i][0]);
             measurementsOfForce(1) += std::stod(data[i][1]);
             measurementsOfForce(2) += std::stod(data[i][2]);
