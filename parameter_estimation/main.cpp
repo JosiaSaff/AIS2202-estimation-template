@@ -52,7 +52,7 @@ Eigen::Vector3d calculateTorqueBias(const Eigen::MatrixXd &torqueMeasurements, i
     return torqueBias;
 }
 
-    Eigen::Vector3d calculateForceBias(const Eigen::MatrixXd &forceMeasurements){
+    Eigen::Vector3d calculateForceBias(const Eigen::MatrixXd &forceMeasurements, int rows){
         Eigen::Vector3d forceBias;
         forceBias(0) = forceMeasurements.col(0).mean();
         forceBias(1) = forceMeasurements.col(1).mean();
@@ -171,12 +171,12 @@ Eigen::Vector3d calculateTorqueBias(const Eigen::MatrixXd &torqueMeasurements, i
 
         //Type problem
         Eigen::VectorXd measurementsOfForce(3);  // Resize vector to have 'row' elements
-        for (int i = 2; i < row+1; ++i) {
+        for (int i = 2; i < row; ++i) {
             measurementsOfForce(0) += std::stod(data[i][0]);
             measurementsOfForce(1) += std::stod(data[i][1]);
             measurementsOfForce(2) += std::stod(data[i][2]);
             //These are for torque
-
+            std::cout << i << std::endl;
         }
 
         std::cout << "measurements of force matrix is: " << measurementsOfForce << std::endl;
