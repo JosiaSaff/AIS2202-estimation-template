@@ -64,11 +64,19 @@ Eigen::Vector3d calculateTorqueBias(const Eigen::MatrixXd &torqueMeasurements, i
 //There are 24 measurements, in a total of 25 lines in the calibration_fts dataset
 
 
-    Eigen::Vector3d calculateIMUBias(const Eigen::MatrixXd &imuMeasurements) {
-        Eigen::Vector3d imuBias;
-        imuBias(0) = imuMeasurements.col(0).mean();
-        imuBias(1) = imuMeasurements.col(1).mean();
-        imuBias(2) = imuMeasurements.col(2).mean();
+    Eigen::Vector3d calculateIMUBias(const Eigen::MatrixXd &imuMeasurements, int row) {
+        //Eigen::VectorXd imuBias = Eigen::VectorXd::Zero(3);
+        Eigen::VectorXd imuBias(3);
+        //imuBias(2) = imuMeasurements.col(2).mean();
+        for(int i = 1; i < row+1; i++){
+            imuBias(0) += imuMeasurements(i, 0);
+            imuBias(1) += imuMeasurements(i, 1);
+            imuBias(2) += imuMeasurements(i, 2);
+            std::cout << "lolololololololololol for row  "  << i <<  "   :  " << imuMeasurements(i, 0) << "   " << imuMeasurements(i, 1) << "   " << imuMeasurements(i, 2) << std::endl;
+        }
+        for(int i = 0; i < 3; i++)
+        imuBias(i) =  imuBias(i)/static_cast<float>(row);
+
         return imuBias;
     }
 
@@ -133,7 +141,8 @@ Eigen::Vector3d calculateTorqueBias(const Eigen::MatrixXd &torqueMeasurements, i
 // Of cource has to skip the first row of fx,fy,fz,tx,ty,tz,ax,ay,az,gx,gy,gz,r11,r12,r13,r21,r22,r23,r31,r32,r33
 
 
-        Eigen::MatrixXd Axyz = Eigen::MatrixXd::Zero(row, 3);
+        //Eigen::MatrixXd Axyz = Eigen::MatrixXd::Zero(row, 3);
+        Eigen::MatrixXd Axyz(row, 3);
 
 
 //Therefor we start on row 2(index 1) in the for loop
@@ -156,7 +165,7 @@ Eigen::Vector3d calculateTorqueBias(const Eigen::MatrixXd &torqueMeasurements, i
 
         std::cout << "The mass estimate is: " << massEstimate << std::endl;
 
-        auto imubias = calculateIMUBias(Axyz);
+        auto imubias = calculateIMUBias(Axyz, row-1);
 
         std::cout << "The imu bias is:" << imubias << std::endl;
 
