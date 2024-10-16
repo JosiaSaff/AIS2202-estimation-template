@@ -52,7 +52,7 @@ Eigen::Vector3d calculateTorqueBias(const Eigen::MatrixXd &torqueMeasurements, i
     return torqueBias;
 }
 
-    Eigen::Vector3d calculateForceBias(const Eigen::MatrixXd &forceMeasurements, int n) {
+    Eigen::Vector3d calculateForceBias(const Eigen::MatrixXd &forceMeasurements){
         Eigen::Vector3d forceBias;
         forceBias(0) = forceMeasurements.col(0).mean();
         forceBias(1) = forceMeasurements.col(1).mean();
@@ -64,7 +64,7 @@ Eigen::Vector3d calculateTorqueBias(const Eigen::MatrixXd &torqueMeasurements, i
 //There are 24 measurements, in a total of 25 lines in the calibration_fts dataset
 
 
-    Eigen::Vector3d calculateIMUBias(const Eigen::MatrixXd &imuMeasurements, int n) {
+    Eigen::Vector3d calculateIMUBias(const Eigen::MatrixXd &imuMeasurements) {
         Eigen::Vector3d imuBias;
         imuBias(0) = imuMeasurements.col(0).mean();
         imuBias(1) = imuMeasurements.col(1).mean();
@@ -77,7 +77,7 @@ Eigen::Vector3d calculateTorqueBias(const Eigen::MatrixXd &torqueMeasurements, i
     const int MAX_COLS = 100;
 
 
-    const std::string filePath = "C:\\Users\\hanur\\CLionProjects\\Cybernetics\\AIS2202-estimation-template\\datasets\\0-calibration_fts-accel.csv";
+    const std::string filePath = "..\\datasets\\0-calibration_fts-accel.csv";
 
     int main() {
 
@@ -133,6 +133,8 @@ Eigen::Vector3d calculateTorqueBias(const Eigen::MatrixXd &torqueMeasurements, i
 // Of cource has to skip the first row of fx,fy,fz,tx,ty,tz,ax,ay,az,gx,gy,gz,r11,r12,r13,r21,r22,r23,r31,r32,r33
 
 
+        Eigen::MatrixXd Axyz = Eigen::MatrixXd::Zero(row, 3);
+
 
 //Therefor we start on row 2(index 1) in the for loop
         for (int i = 1; i < row; ++i) {
@@ -143,12 +145,20 @@ Eigen::Vector3d calculateTorqueBias(const Eigen::MatrixXd &torqueMeasurements, i
             forceVecs(i, 0) = std::stod(data[i][0]);
             forceVecs(i, 1) = std::stod(data[i][1]);
             forceVecs(i, 2) = std::stod(data[i][2]);
+
+            Axyz(i, 0) = std::stod(data[i][6]);
+            Axyz(i, 1) = std::stod(data[i][7]);
+            Axyz(i, 2) = std::stod(data[i][8]);
+
         }
 
         double massEstimate = estimationOfMass(gravityVecs, forceVecs);
 
         std::cout << "The mass estimate is: " << massEstimate << std::endl;
 
+        auto imubias = calculateIMUBias(Axyz);
+
+        std::cout << "The imu bias is:" << imubias << std::endl;
 
         //Type problem
         Eigen::VectorXd measurementsOfForce(3);  // Resize vector to have 'row' elements
@@ -166,7 +176,7 @@ Eigen::Vector3d calculateTorqueBias(const Eigen::MatrixXd &torqueMeasurements, i
         std::cout << "" << std::endl;
 
         //this does not work for some reason{
-        Eigen::VectorXd forceBias = estimateForestimateForceBias(measurementsOfForce, row, 3);
+        Eigen::VectorXd forceBias = calculateForceBias(measurementsOfForce);
 
         //This is correct
         std::cout << "The force bias is: " << forceBias << std::endl; //}
