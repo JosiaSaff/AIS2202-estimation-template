@@ -4,28 +4,10 @@
 #include <fstream>
 #include <sstream>
 #include <filesystem>
+#include <math.h>
 #include <vector>
 
 // https://www.ibm.com/docs/en/zos/2.4.0?topic=only-explicit-initialization-constructors-c
-class parameterEstimator {
-    double re, im;
-public:
-
-    // default constructor
-    parameterEstimator() : re(0), im(0) { }
-
-    // copy constructor
-    parameterEstimator(const parameterEstimator& c) { re = c.re; im = c.im; }
-
-    // constructor with default trailing argument
-    parameterEstimator( double r, double i = 0.0) { re = r; im = i; }
-
-    void display() {
-        std::cout << "re = "<< re << " im = " << im << std::endl;
-    }
-};
-
-
 
 //Make sure parameter_estimation folder is used
 
@@ -46,8 +28,7 @@ Eigen::VectorXd massCenterEstimation(Eigen::MatrixXd &gravityVecg, Eigen::Vector
 }
 
 
-Eigen::VectorXd estimateForceBias(const Eigen::VectorXd &measurements, int rows) {
-    int columns = 6;
+Eigen::VectorXd estimateForceBias(const Eigen::VectorXd &measurements, int rows, int columns) {
     Eigen::VectorXd forceBias = Eigen::VectorXd::Zero(columns);
 
     for (int i = 0; i < columns; i++) {
@@ -56,180 +37,217 @@ Eigen::VectorXd estimateForceBias(const Eigen::VectorXd &measurements, int rows)
     return forceBias;
 }
 
+//Eigen::VectorXd findTorqueBias(Eigen::VectorXd torqueVector, Eigen::VectorXd forceVector, Eigen::VectorXd armVector)
+
+
+Eigen::Vector3d calculateTorqueBias(const Eigen::MatrixXd &torqueMeasurements, int startIndex, int endIndex) {
+    Eigen::Vector3d torqueBias;
+    int count = endIndex - startIndex + 1;
+
+    // Calculate the mean of the range for each torque axis (tx, ty, tz)
+    torqueBias(0) = torqueMeasurements.col(0).segment(startIndex, count).mean();
+    torqueBias(1) = torqueMeasurements.col(1).segment(startIndex, count).mean();
+    torqueBias(2) = torqueMeasurements.col(2).segment(startIndex, count).mean();
+
+    return torqueBias;
+}
+
+    Eigen::Vector3d calculateForceBias(const Eigen::MatrixXd &forceMeasurements, int n) {
+        Eigen::Vector3d forceBias;
+        forceBias(0) = forceMeasurements.col(0).mean();
+        forceBias(1) = forceMeasurements.col(1).mean();
+        forceBias(2) = forceMeasurements.col(2).mean();
+        return forceBias;
+    }
+
 
 //There are 24 measurements, in a total of 25 lines in the calibration_fts dataset
 
 
-/*
-Eigen::MatrixXd gravityCompensation(const Eigen::VectorXd& gravityVec, const Eigen::MatrixXd& rotMatrix, double massEstimated, const Eigen::VectorXd &torqueVec) {
-    Eigen::Vector3d gravityForce = massEstimated * (rotMatrix.transpose() * gravityVec);
-    Eigen::Vector3d centerOfMass = massCenterEstimation(gravityVec, torqueVec, massEstimated);
-
-    Eigen::Vector3d gravityTorque = centerOfMass.cross(gravityForce);
-    Eigen::MatrixXd compensation(6, 1);
-    compensation.block<3,1>(0,0) = gravityForce;
-    compensation.block<3,1>(3,0) = gravityTorque;
-    return compensation;
-}*/
-
-
-const int MAX_ROWS = 100;
-const int MAX_COLS = 100;
-
-
-const std::string filePath = "C:\\Users\\hanur\\CLionProjects\\Cybernetics\\AIS2202-estimation-template\\datasets\\0-calibration_fts-accel.csv";
-
-int main() {
-
-    if (!std::filesystem::exists(filePath)) {
-        std::cout << "FILE DO NOT EXIST!" << std::endl;
-        return 1;
+    Eigen::Vector3d calculateIMUBias(const Eigen::MatrixXd &imuMeasurements, int n) {
+        Eigen::Vector3d imuBias;
+        imuBias(0) = imuMeasurements.col(0).mean();
+        imuBias(1) = imuMeasurements.col(1).mean();
+        imuBias(2) = imuMeasurements.col(2).mean();
+        return imuBias;
     }
 
-    std::ifstream file(filePath);
+
+    const int MAX_ROWS = 100;
+    const int MAX_COLS = 100;
 
 
-    if (!file.is_open()) {
-       std::cout << "Error, file is probably already open" << std::endl;
-        return 1;
-    }
+    const std::string filePath = "C:\\Users\\hanur\\CLionProjects\\Cybernetics\\AIS2202-estimation-template\\datasets\\0-calibration_fts-accel.csv";
 
-    std::string data[MAX_ROWS][MAX_COLS];
-    std::string line;
-    int row = 0;
+    int main() {
 
-    while (getline(file, line) && row < MAX_ROWS) {
-        std::stringstream ss(line);
-        std::string cell;
-        int col = 0;
-
-        while (getline(ss, cell, ',') && col < MAX_COLS) {
-            data[row][col] = cell;
-            col++;
+        if (!std::filesystem::exists(filePath)) {
+            std::cout << "FILE DO NOT EXIST!" << std::endl;
+            return 1;
         }
-        row++;
-    }
-    file.close();
 
-    for (int i = 0; i < row; ++i) {
-        for (int j = 0; j < MAX_COLS; ++j) {
-            std::cout << data[i][j] << " ";
+        std::ifstream file(filePath);
+
+
+        if (!file.is_open()) {
+            std::cout << "Error, file is probably already open" << std::endl;
+            return 1;
         }
-        std::cout << std::endl;
-    }
 
-    std::cout << "Number of rows: " << row << std::endl;
-    std::cout << "Number of columns per row (max): " << MAX_COLS << std::endl;
+        std::string data[MAX_ROWS][MAX_COLS];
+        std::string line;
+        int row = 0;
+
+        while (getline(file, line) && row < MAX_ROWS) {
+            std::stringstream ss(line);
+            std::string cell;
+            int col = 0;
+
+            while (getline(ss, cell, ',') && col < MAX_COLS) {
+                data[row][col] = cell;
+                col++;
+            }
+            row++;
+        }
+        file.close();
+
+        for (int i = 0; i < row; ++i) {
+            for (int j = 0; j < MAX_COLS; ++j) {
+                std::cout << data[i][j] << " ";
+            }
+            std::cout << std::endl;
+        }
+
+        std::cout << "Number of rows: " << row << std::endl;
+        std::cout << "Number of columns per row (max): " << MAX_COLS << std::endl;
 
 
-    Eigen::MatrixXd gravityVecs(row, 3);
-    Eigen::MatrixXd forceVecs(row, 3);
+        Eigen::MatrixXd gravityVecs = Eigen::MatrixXd::Zero(row, 3);
+        Eigen::MatrixXd forceVecs = Eigen::MatrixXd::Zero(row, 3);
 
 //    std::cout << "Values i want: " << gravityVecs(0,0) << std::endl;
 
-    std::cout << "data[1][9] has value " << data[0][1] << " and is of type " << typeid(data[1][9]).name() << std::endl;
+        std::cout << "data[1][9] has value " << data[0][1] << " and is of type " << typeid(data[1][9]).name()
+                  << std::endl;
 
 // Of cource has to skip the first row of fx,fy,fz,tx,ty,tz,ax,ay,az,gx,gy,gz,r11,r12,r13,r21,r22,r23,r31,r32,r33
 
 
 
 //Therefor we start on row 2(index 1) in the for loop
-    for (int i = 1; i < row; ++i) {
-        gravityVecs(i,0) = std::stod(data[i][9]);
-        gravityVecs(i,1) = std::stod(data[i][10]);
-        gravityVecs(i,2) = std::stod(data[i][11]);
+        for (int i = 1; i < row; ++i) {
+            gravityVecs(i, 0) = std::stod(data[i][9]);
+            gravityVecs(i, 1) = std::stod(data[i][10]);
+            gravityVecs(i, 2) = std::stod(data[i][11]);
 
-        forceVecs(i,0) = std::stod(data[i][0]);
-        forceVecs(i,1) = std::stod(data[i][1]);
-        forceVecs(i,2) = std::stod(data[i][2]);
-    }
+            forceVecs(i, 0) = std::stod(data[i][0]);
+            forceVecs(i, 1) = std::stod(data[i][1]);
+            forceVecs(i, 2) = std::stod(data[i][2]);
+        }
 
-    double massEstimate = estimationOfMass(gravityVecs, forceVecs);
+        double massEstimate = estimationOfMass(gravityVecs, forceVecs);
 
-    std::cout << "The mass estimate is: " << massEstimate << std::endl;
-
-
-     //Type problem
-    Eigen::VectorXd measurementsOfForce(6);  // Resize vector to have 'row' elements
-    for (int i = 1; i < row; ++i) {
-        //Eigen::VectorXd measurement(6);
-        measurementsOfForce(0) += std::stod(data[i][0]);
-        measurementsOfForce(1) += std::stod(data[i][1]);
-        measurementsOfForce(2) += std::stod(data[i][2]);
-        //These are for torque
-        measurementsOfForce(3) += std::stod(data[i][3]);
-        measurementsOfForce(4) += std::stod(data[i][4]);
-        measurementsOfForce(5) += std::stod(data[i][5]);
-    }
-
-    std::cout << "measurements of force matrix is: " << measurementsOfForce << std::endl;
-
-    //std::cout << "" << std::endl;
-    std::cout << "" << std::endl;
-
-    //this does not work for some reason{
-    Eigen::VectorXd forceBias = estimateForceBias(measurementsOfForce, row);
-
-    std::cout << "The force bias is: " << forceBias << std::endl; //}
+        std::cout << "The mass estimate is: " << massEstimate << std::endl;
 
 
-
-
-
-
-    Eigen::MatrixXd torqueVecs(row, 3);
-    Eigen::VectorXd stackedTorques(3);
-    Eigen::MatrixXd stackedGravMatrices(3,3);
-
-    //  Eigen:  : M  a    t r i x X  d gravityVec(row, 3);
-    //The matrix is not initialized at 0 for some reason
-
-    for (int i = 0; i < 3; ++i){
-        stackedTorques(i) = 0.0;
-        for (int j = 0; j < 3; ++j){
-            stackedGravMatrices(i,j) = 0.0;
+        //Type problem
+        Eigen::VectorXd measurementsOfForce(3);  // Resize vector to have 'row' elements
+        for (int i = 1; i < row; ++i) {
+            measurementsOfForce(0) += std::stod(data[i][0]);
+            measurementsOfForce(1) += std::stod(data[i][1]);
+            measurementsOfForce(2) += std::stod(data[i][2]);
+            //These are for torque
 
         }
+
+        std::cout << "measurements of force matrix is: " << measurementsOfForce << std::endl;
+
+        //std::cout << "" << std::endl;
+        std::cout << "" << std::endl;
+
+        //this does not work for some reason{
+        Eigen::VectorXd forceBias = estimateForestimateForceBias(measurementsOfForce, row, 3);
+
+        //This is correct
+        std::cout << "The force bias is: " << forceBias << std::endl; //}
+
+
+
+
+
+
+        Eigen::MatrixXd torqueMeasurements = Eigen::MatrixXd::Zero(row, 3);
+        Eigen::VectorXd stackedTorques = Eigen::VectorXd::Zero(3);
+        Eigen::MatrixXd stackedGravMatrices = Eigen::MatrixXd::Zero(3, 3);
+
+        //  Eigen:  : M  a    t r i x X  d gravityVec(row, 3);
+        //The matrix is not initialized at 0 for some reason
+
+        for (int i = 0; i < 3; ++i) {
+            stackedTorques(i) = 0.0;
+            for (int j = 0; j < 3; ++j) {
+                stackedGravMatrices(i, j) = 0.0;
+
+            }
+        }
+        std::cout << "stacked graxMatrices:" << stackedGravMatrices << std::endl;
+
+
+        for (int i = 1; i < row; ++i) {
+            stackedTorques(0) += std::stod(data[i][3]);  // Collect columns 4-6
+            stackedTorques(1) += std::stod(data[i][4]);
+            stackedTorques(2) += std::stod(data[i][5]);
+
+            torqueMeasurements(i, 0) = std::stod(data[i][3]);  // Collect columns 4-6
+            torqueMeasurements(i, 1) = std::stod(data[i][4]);
+            torqueMeasurements(i, 2) = std::stod(data[i][5]);
+
+
+            stackedGravMatrices(1, 0) += std::stod(data[i][11]);
+            stackedGravMatrices(0, 2) += std::stod(data[i][10]);
+            stackedGravMatrices(2, 1) += std::stod(data[i][9]);
+        }
+
+        //I have to make sure the indexes are mirrored
+
+        stackedGravMatrices(0, 1) = -stackedGravMatrices(1, 0); //this is for the secoudnd
+        stackedGravMatrices(2, 0) = -stackedGravMatrices(0, 2); // this is for the first
+        stackedGravMatrices(1, 2) = -stackedGravMatrices(2, 1); //This is cenrtantly for the third
+
+
+        std::cout << "stacked torques:" << stackedTorques << std::endl;
+        std::cout << "stacked gravMatrices:" << stackedGravMatrices << std::endl;
+
+
+        auto massCenter = massCenterEstimation(stackedGravMatrices, stackedTorques, massEstimate);
+
+        std::cout << "" << std::endl;
+        std::cout << "The calculated mass center is: " << massCenter << ", with the mass estimate of :" << massEstimate
+                  << "." << std::endl;
+        std::cout << " ------------------------------------------------------------------------- " << std::endl;
+        std::cout << " ------------------------------------------------------------------------- " << std::endl;
+
+        // I can't reach the documentation WHAT!!??!?!?!?
+
+        Eigen::Vector3d solutionMassCenter;
+        massCenter << 0.00027917, 5.44378 * pow(10, -5), 0.43896;
+
+
+        //THIS IS CORREC
+        //
+        Eigen::Vector3d torqueBias = calculateTorqueBias(torqueMeasurements, 0, 7);  // For tx
+        Eigen::Vector3d tyBias = calculateTorqueBias(torqueMeasurements, 8, 15);  // For ty
+        Eigen::Vector3d tzBias = calculateTorqueBias(torqueMeasurements, 16, 23);  // For tz
+
+
+        std::cout << "" << std::endl;
+        std::cout << "The calculated  torque bias is: " << torqueBias << std::endl;
+        std::cout << " ------------------------------------------------------------------------- " << std::endl;
+        std::cout << " ------------------------------------------------------------------------- " << std::endl;
+
+
+        return 0;
     }
-    std::cout << "stacked graxMatrices:" << stackedGravMatrices << std::endl;
-
-
-
-
-    for (int i = 1; i < row; ++i) {
-        stackedTorques(0) += std::stod(data[i][3]);  // Collect columns 4-6
-        stackedTorques(1) += std::stod(data[i][4]);
-        stackedTorques(2) += std::stod(data[i][5]);
-
-
-        stackedGravMatrices(0,1) += std::stod(data[i][10]);
-        stackedGravMatrices(2,0) += std::stod(data[i][11]);
-        stackedGravMatrices(1,2) += std::stod(data[i][9]);
-    }
-
-    //I have to make sure the indexes are mirrored
-
-    stackedGravMatrices(1,0) = - stackedGravMatrices(0,1); //this is for the secoudnd
-    stackedGravMatrices(0,2) = - stackedGravMatrices(2,0); // this is for the first
-    stackedGravMatrices(2,1) = - stackedGravMatrices(1,2); //This is cenrtantly for the third
-
-
-    std::cout << "stacked torques:" << stackedTorques << std::endl;
-    std::cout << "stacked gravMatrices:" << stackedGravMatrices << std::endl;
-
-
-    auto massCenter = massCenterEstimation(stackedGravMatrices, stackedTorques, massEstimate);
-
-    std::cout << "" << std::endl;
-    std::cout << "The calculated mass center is: " << massCenter << ", with the mass estimate of :" << massEstimate << "." << std::endl;
-    std::cout << " ------------------------------------------------------------------------- " << std::endl;
-    std::cout << " ------------------------------------------------------------------------- " << std::endl;
-
-
-
-
-    return 0;
-}
 
 //rotasjonsmatrise for tilstandsestimering på nettsida
 
