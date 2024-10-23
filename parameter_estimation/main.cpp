@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <math.h>
 #include <vector>
+#include "../estimation/include/estimation/kalman_filter.h"
 
 // https://www.ibm.com/docs/en/zos/2.4.0?topic=only-explicit-initialization-constructors-c
 
@@ -25,8 +26,8 @@ double estimationOfMass(Eigen::MatrixXd &gravityVecs, Eigen::MatrixXd &forceVecs
 
 Eigen::Vector3d calculateTorqueBias(const Eigen::MatrixXd &torqueMeasurements, int startXIndex, int count) {
     Eigen::Vector3d torqueBias;
-    std::cout << "First row :  " << torqueMeasurements.col(0).segment(startXIndex, count) << std::endl;
-    std::cout << "torque measurements:  " << torqueMeasurements << std::endl;
+//    std::cout << "First row :  " << torqueMeasurements.col(0).segment(startXIndex, count) << std::endl;
+//    std::cout << "torque measurements:  " << torqueMeasurements << std::endl;
     torqueBias(0) = torqueMeasurements.col(0).segment(startXIndex+1, count).mean();
     torqueBias(1) = torqueMeasurements.col(1).segment(startXIndex+1+count, count).mean();
     torqueBias(2) = torqueMeasurements.col(2).segment(startXIndex+1+(2*count), count).mean();
@@ -84,11 +85,11 @@ Eigen::MatrixXd estimateMassCenter(const Eigen::MatrixXd &gravityVecs, const Eig
     const int MAX_COLS = 100;
 
 
-    const std::string filePath = "..\\datasets\\0-calibration_fts-accel.csv";
+    const std::string filePath = "../../datasets/0-calibration_fts-accel.csv";
 
     int main() {
-
         if (!std::filesystem::exists(filePath)) {
+            std::cout << filePath << std::endl;
             std::cout << "FILE DO NOT EXIST!" << std::endl;
             return 1;
         }
@@ -120,9 +121,9 @@ Eigen::MatrixXd estimateMassCenter(const Eigen::MatrixXd &gravityVecs, const Eig
 
         for (int i = 0; i < row; ++i) {
             for (int j = 0; j < MAX_COLS; ++j) {
-                std::cout << data[i][j] << " ";
+//                std::cout << data[i][j] << " ";
             }
-            std::cout << std::endl;
+//            std::cout << std::endl;
         }
 
         std::cout << "Number of rows: " << row << std::endl;
@@ -205,7 +206,22 @@ Eigen::MatrixXd estimateMassCenter(const Eigen::MatrixXd &gravityVecs, const Eig
         Eigen::Vector3d torqueBias = calculateTorqueBias(torqueMeasurements, 0, 8);  // For tx
         std::cout << "The calculated  torque bias is: " << torqueBias.transpose() << std::endl;
 
+        estimation::kalman_filter kf(massEstimate, massCenter, forceBias, imubias);
 
+        for (int i = 0; i < row; ++i) {
+            //må kankjse oppdatere rotasjonsmatrise
+//            kf.set_rotation_matrix()
+            kf.predict();
+            Eigen::Vector3d imuAcceleration(std::stod(data[i][6]), std::stod(data[i][7]), std::stod(data[i][8]));
+            Eigen::Vector3d ftsForce(std::stod(data[i][0]), std::stod(data[i][1]), std::stod(data[i][2]));
+            Eigen::Vector3d ftsTorque(std::stod(data[i][3]), std::stod(data[i][4]), std::stod(data[i][5]));
+
+            kf.update(imuAcceleration, ftsForce, ftsTorque);
+
+            Eigen::VectorXd contact_wrench = kf.get_contact_wrench();
+
+            std::cout << "Estimated contact wrench: " << contact_wrench << std::endl;
+        }
 
         return 0;
     }
