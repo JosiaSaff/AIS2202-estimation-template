@@ -12,12 +12,6 @@
 //Make sure parameter_estimation folder is used
 
 
-Eigen::MatrixXd pseudo_inverse(const Eigen::MatrixXd &G, const Eigen::MatrixXd &F)
-{
-    auto pseudoInv = (G.transpose() * G).completeOrthogonalDecomposition().pseudoInverse() * (G.transpose() * F);
-    return pseudoInv;
-}
-
 double estimationOfMass(Eigen::MatrixXd &gravityVecs, Eigen::MatrixXd &forceVecs){
     return ((gravityVecs.transpose() * gravityVecs).completeOrthogonalDecomposition().pseudoInverse() * (gravityVecs.transpose() * forceVecs)).value();
 }
@@ -58,7 +52,6 @@ Eigen::MatrixXd estimateMassCenter(const Eigen::MatrixXd &gravityVecs, const Eig
         bTorque(3*i + 1) = torqueVecs(i, 1);
         bTorque(3*i + 2) = torqueVecs(i, 2);
     }
-
     Eigen::VectorXd xTorque = aTorque.colPivHouseholderQr().solve(bTorque);
     Eigen::Vector3d massCenter = xTorque.tail(3);
     return massCenter;
