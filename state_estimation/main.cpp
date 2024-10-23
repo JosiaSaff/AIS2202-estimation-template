@@ -23,7 +23,7 @@ estimation::kalman_filter kalman(mass, massCenter, ftsBias, imuBias);
 Eigen::Matrix3d rotationMatrix = Eigen::Matrix3d::Identity();
 kalman.set_rotation_matrix(rotationMatrix);
 
-
+//dw
 //stedy state acceleration here??
 Eigen::Vector3d imuAccel(0.0, 0.0, 9.81);
 
