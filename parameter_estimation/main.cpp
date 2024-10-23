@@ -8,8 +8,7 @@
 #include <vector>
 
 // https://www.ibm.com/docs/en/zos/2.4.0?topic=only-explicit-initialization-constructors-c
-
-//Make sure parameter_estimation folder is used
+// Make sure parameter_estimation folder is used
 
 
 double estimationOfMass(Eigen::MatrixXd &gravityVecs, Eigen::MatrixXd &forceVecs){
@@ -19,8 +18,8 @@ double estimationOfMass(Eigen::MatrixXd &gravityVecs, Eigen::MatrixXd &forceVecs
 
 Eigen::Vector3d calculateTorqueBias(const Eigen::MatrixXd &torqueMeasurements, int startXIndex, int count) {
     Eigen::Vector3d torqueBias;
-    std::cout << "First row :  " << torqueMeasurements.col(0).segment(startXIndex, count) << std::endl;
-    std::cout << "torque measurements:  " << torqueMeasurements << std::endl;
+    //std::cout << "First row :  " << torqueMeasurements.col(0).segment(startXIndex, count) << std::endl;
+    //std::cout << "torque measurements:  " << torqueMeasurements << std::endl;
     torqueBias(0) = torqueMeasurements.col(0).segment(startXIndex+1, count).mean();
     torqueBias(1) = torqueMeasurements.col(1).segment(startXIndex+1+count, count).mean();
     torqueBias(2) = torqueMeasurements.col(2).segment(startXIndex+1+(2*count), count).mean();
