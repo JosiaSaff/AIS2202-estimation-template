@@ -2,13 +2,13 @@ clc, close all, clear all;
 % For the last task.
 
 % Load the FTS and IMU data
-FTS_data = readtable('datasets/0-calibration_fts-accel.csv');
-steady_state_accel = readtable('datasets\0-steady-state_accel.csv');
-steady_state_wrench = readtable('datasets\0-steady-state_wrench.csv');
+FTS_data = readtable('../datasets/0-calibration_fts-accel.csv');
+steady_state_accel = readtable('..\datasets\0-steady-state_accel.csv');
+steady_state_wrench = readtable('..\datasets\0-steady-state_wrench.csv');
 
-baseline_accel = readtable('datasets\2-vibrations_accel.csv');
-baseline_orientations = readtable('datasets\2-vibrations_orientations.csv');
-baseline_wrench = readtable('datasets\1-baseline_wrench.csv');
+baseline_accel = readtable('..\datasets\2-vibrations_accel.csv');
+baseline_orientations = readtable('..\datasets\2-vibrations_orientations.csv');
+baseline_wrench = readtable('..\datasets\1-baseline_wrench.csv');
 
 vibrations_accel = readtable('datasets\2-vibrations_accel.csv');
 vibrations_wrench = readtable('datasets\2-vibrations_wrench.csv');
@@ -43,8 +43,10 @@ gy = FTS_data.gy;
 gz = FTS_data.gz;
 
 % Estimate mass and mass center (from the paper, eq. (23))
-estimated_mass = 0.932308;  %      kg
-mass_center = [0, 0, 0.044];  % m (estimated)
+estimated_mass = 0.932308;
+
+%mass center shown in paper
+mass_center = [0.0, 0, 0.0439107]; 
 
 % Compute gravity compensation vector (from eq. (12) in the paper)
 g_w = [0; 0; -9.81];  % Gravity vector in world frame
@@ -57,6 +59,9 @@ g_s = R_fs * g_w;  % Gravity in sensor frame
 %Equation (12)
 Vg = [estimated_mass * g_s; cross(mass_center', estimated_mass * g_s')'];
 
+variance_f_torque = [0.3090 0.1110 1.4084]
+variance_f_force = [0.0068 0.0175 0.0003]
+variance_f_acceleration = [0.4193 0.1387 0.9815]
 
 % Gravity vector Vg
 % Subtract gravity from the wrench measurements
@@ -68,8 +73,8 @@ compensated_ty = ty - Vg(5);
 compensated_tz = tz - Vg(6);
 
 % Compute the variances for force and acceleration (steady state)
-force_variances = var([steady_state_wrench.fx, steady_state_wrench.fy, steady_state_wrench.fz]);
-accel_variances = var([steady_state_accel.ax, steady_state_accel.ay, steady_state_accel.az]);
+%force_variances = var([steady_state_wrench.fx, steady_state_wrench.fy, steady_state_wrench.fz]);
+%accel_variances = var([steady_state_accel.ax, steady_state_accel.ay, steady_state_accel.az]);
 
 disp('Force Variances:');
 disp(force_variances);
@@ -87,16 +92,13 @@ P = eye(6);       % Covariance matrix
 Q = blkdiag(eye(3), eye(3));  % Process noise covariance (assuming identity for simplicity)
 
 % Assume R (measurement noise covariance) calculated from variance of steady-state data
-R_f = diag([var(baseline_wrench.fx), var(baseline_wrench.fy), var(baseline_wrench.fz), ...
-            var(baseline_wrench.tx), var(baseline_wrench.ty), var(baseline_wrench.tz)]);
+R_f = [diag(variance_f_force), zeros(3,3); zeros(3,3) diag(variance_f_torque)];
 
-% Assume accelerometer noise variance
-R_a = diag([var(baseline_accel.ax), var(baseline_accel.ay), var(baseline_accel.az)]);
-
-% Kalman filter loop for baseline case
+R_a = diag(variance_f_acceleration)
+% Kalman filter loop for
 for i = 2:n
     % Prediction step
-    X(:, i) = X(:, i-1);  % Assuming constant wrench assumption
+    X(:, i) = X(:, i-1); 
     P = P + Q;            % Update covariance matrix
 
     % Measurement vector
