@@ -4,6 +4,15 @@
 
 int main()
 {
+    /*
+     * Number of rows: 25
+Number of columns per row (max): 100
+The mass estimate is: 0.932043
+The imu bias is:-0.00366194  0.00884945   0.0771078
+The force bias is:  9.07633 -1.01814  9.98482
+The calculated mass center is:     -0.00028 -5.44085e-05   -0.0439107, with the mass estimate of :0.932043.
+The calculated  torque bias is:  0.432449 -0.692162 -0.156746
+     */
 
 
 //All of these can be found in paper 3
