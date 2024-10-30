@@ -15,7 +15,7 @@ Eigen::Vector3d massCenter(0.0, 0.0, 0.044);
 Eigen::Vector3d ftsBias(9.07633, -1.01814, 9.98482);
 
 //IMU Bias
-Eigen::Vector3d imuBias(-0.00366194, 0.00884945, 0.0771078);  // Replace with actual IMU bias
+Eigen::Vector3d imuBias(-0.00366194, 0.00884945, 0.0771078);
 
 
 estimation::kalman_filter kalman(mass, massCenter, ftsBias, imuBias);
