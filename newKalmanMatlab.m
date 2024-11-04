@@ -33,9 +33,9 @@ ty = FTS_data.ty;
 tz = FTS_data.tz;
 
 % Extract accelerometer data
-ax = FTS_data.ax;
-ay = FTS_data.ay;
-az = FTS_data.az;
+ax = -0.0175781;
+ay = -0.993652;
+az = 0.0722656;
 
 % Extract gravity direction (gx, gy, gz) - used later for compensation
 gx = FTS_data.gx;
@@ -53,6 +53,18 @@ tz_baseline = baseline_wrench.tz;
 wrench_ss_time = baseline_wrench.t;
 orientations_ss_time = baseline_orientations.t
 % Estimate mass and mass center (from the paper, eq. (23))
+
+%Finding standard deviations
+std_ax = std(baseline_accel.ax);
+std_ay = std(baseline_accel.ay);
+std_az = std(baseline_accel.az);
+std_fx = std(baseline_wrench.fx);
+std_fy = std(baseline_wrench.fy);
+std_fz = std(baseline_wrench.tx);
+std_tx = std(baseline_wrench.tx);
+std_ty = std(baseline_wrench.ty);
+std_tz = std(baseline_wrench.tz);
+
 
 orient_r11 = baseline_orientations.r11;
 orient_r12 = baseline_orientations.r12;
@@ -143,18 +155,25 @@ dt_mean = mean(diff(baseline_wrench.t)) * 1e-6;
 linearAccelerationVariance = 0.5; %Specified in equation 24 in paper 3
 
 %Finding how many times the code should iterate
-n = length(baseline_accel.ax); 
+
+n = length(baseline_wrench.fx); 
+H_a = [eye(3), zeros(3), zeros(3)];
+H_f = [zeros(3), eye(3), zeros(3);
+    zeros(3), zeros(3), eye(3)];
+H_k = [H_a; H_f]
 
 H_c = [-estimated_mass * eye(3), eye(3), zeros(3);
        -estimated_mass * mass_center_screwsym, zeros(3), eye(3)];
-zHat_cont = zeros(n, 6)
-
+%H_c = H_k
 
 %For slicing: since all the acceleration vectors don't have the same length
 %as the
 len_acc = length(baseline_accel.ax);
-X = [baseline_accel.ax, baseline_accel.ay, baseline_accel.az, compensated_fx_baseline(1:len_acc), compensated_fy_baseline(1:len_acc), compensated_fz_baseline(1:len_acc), compensated_tx_baseline(1:len_acc), compensated_ty_baseline(1:len_acc), compensated_tz_baseline(1:len_acc)];
-X_hat_est = zeros(n, 6)
+X_f_t = [compensated_fx_baseline, compensated_fy_baseline, compensated_fz_baseline, compensated_tx_baseline, compensated_ty_baseline, compensated_tz_baseline];
+zHat_cont = zeros(n, 6);
+X_hat_est = zeros(n, 6);
+X = zeros(n, 9);
+z_k = zeros(n, 9)
 % Initial state for forces and torques
 %Need to transpose the line for every iteration
 %X = zeros(n, 9)  
@@ -162,7 +181,9 @@ P = eye(9);
 
 %Covariance matrix in equation 17 in paper 3 
 
-Q_k = dt_mean*[eye(3), zeros(3), zeros(3);
+
+%have to apply dynamic DT later.
+Q_k = [eye(3), zeros(3), zeros(3);
   zeros(3), estimated_mass*eye(3), zeros(3);
     zeros(3), zeros(3), estimated_mass*norm(mass_center)*eye(3)]*linearAccelerationVariance;  
 
@@ -173,21 +194,23 @@ R_f = [diag(variance_f_force), zeros(3,3); zeros(3,3) diag(variance_f_torque)];
 R_a = diag(variance_f_acceleration);
 
 B = [eye(3); estimated_mass*eye(3); estimated_mass*mass_center_screwsym];
+disp('B')
+disp(B)
+
+%D_k = zeros(size(B));
+D_k = 0.1 * [eye(3); zeros(3); zeros(3)];
+%D_k = diag([bias_fx, bias_fy, bias_fz, bias_tx, bias_ty, bias_tz]);
 
 % use change in the input and the oriantation matrix
-%u_k = (R_ws(:,:,i)' * g_w - g_s) * (fr / (ff + fa));
 % g_w is the gravitational acceleration expressed in the world frame
-% g_s is the gravitational acceleration expressed in the sensor frame
-%X(i, :) = X(i-1, :)' + B_k * u_k;
 
 
-deltaG_sk = [(compensated_fx_baseline(i) - compensated_fx_baseline(i-1)); 
-             (compensated_fy_baseline(i) - compensated_fy_baseline(i-1)); 
-             (compensated_fz_baseline(i) - compensated_fz_baseline(i-1))]; 
+deltaG_sk = g_s;
    
 u_k = deltaG_sk * (fr / (ff + fa));
 
 orientations_ss_time_index = 1;
+base_accel_index = 1
 
 
 
@@ -195,65 +218,81 @@ for i = 2:n
     %to get toqrue and force we cant divide by mass here
     %Mass and the arm gets included by the input matrix B
 
-    while baselineTime(i) >  orientations_ss_time(orientations_ss_time_index+1)
+    %sensor fusion
+
+    while (wrench_ss_time(i) >  orientations_ss_time(orientations_ss_time_index)) & (orientations_ss_time_index < 627)
         %makes sure to update the trajectory
         orientations_ss_time_index = orientations_ss_time_index + 1; 
-
-        deltaG_sk = (g_s*[orient_r11(orientations_ss_time_index), orient_r12(orientations_ss_time_index), orient_r13(orientations_ss_time_index); orient_r21(orientations_ss_time_index), orient_r22(orientations_ss_time_index), orient_r23(orientations_ss_time_index); orient_r31(orientations_ss_time_index), orient_r32(orientations_ss_time_index), orient_r33(orientations_ss_time_index)] - lastTrajectory);
+        % g_s is gravitation vector in world frave 
+        deltaG_sk = ([orient_r11(orientations_ss_time_index), orient_r12(orientations_ss_time_index), orient_r13(orientations_ss_time_index); orient_r21(orientations_ss_time_index), orient_r22(orientations_ss_time_index), orient_r23(orientations_ss_time_index); orient_r31(orientations_ss_time_index), orient_r32(orientations_ss_time_index), orient_r33(orientations_ss_time_index)]*g_w - lastTrajectory);
         u_k = deltaG_sk * (fr / (ff + fa));
-        lastTrajectory = g_s*orient_r11(orientations_ss_time_index), orient_r12(orientations_ss_time_index), orient_r13(orientations_ss_time_index); orient_r21(orientations_ss_time_index), orient_r22(orientations_ss_time_index), orient_r23(orientations_ss_time_index); orient_r31(orientations_ss_time_index), orient_r32(orientations_ss_time_index), orient_r33(orientations_ss_time_index);
+        lastTrajectory = [orient_r11(orientations_ss_time_index), orient_r12(orientations_ss_time_index), orient_r13(orientations_ss_time_index); orient_r21(orientations_ss_time_index), orient_r22(orientations_ss_time_index), orient_r23(orientations_ss_time_index); orient_r31(orientations_ss_time_index), orient_r32(orientations_ss_time_index), orient_r33(orientations_ss_time_index)]*g_w;
+    end 
+
+    while (wrench_ss_time(i) >  baseline_accel.t(base_accel_index)) & (base_accel_index < 1593)
+        
+        base_accel_index = base_accel_index + 1; 
+      
+        ax = baseline_accel.ax(base_accel_index);
+        ay = baseline_accel.ay(base_accel_index);
+        az = baseline_accel.az(base_accel_index);
     end 
     
-    %deltaG_sk = [(fx_baseline(i)-fx_baseline(i-1)); (fy_baseline(i)-fy_baseline(i-1)); (fz_baseline(i)-fz_baseline(i-1))] 
-    %deltaG_sk = [(compensated_fx_baseline(i) - compensated_fx_baseline(i-1)); 
-    %         (compensated_fy_baseline(i) - compensated_fy_baseline(i-1)); 
-    %         (compensated_fz_baseline(i) - compensated_fz_baseline(i-1))]; 
-    %
+    
     u_k = deltaG_sk * (fr / (ff + fa));
+    %Measurements, or observations from the process, are related to the state vector as shown in (2)
+    %define gaussian noice
+    %gaussian_noise = std_dev * randn(size(u_k));
+    gaussian_noise = [std_ax, std_ay, std_az, std_fx, std_fy, std_fz, std_tx, std_ty, std_tz]' .* (randn(9, 1)/10);
+    %disp(H_k*u_k + B_K*u_k + [std_ax, std_ay; std_az; std_fx; std_fy; std_fz; std_tx; std_ty; std_tz] * randn(size(u_k)))
+    z_k(i, :) = (H_k*[ax,ay,az,X_f_t(i,:)]' + D_k*u_k + gaussian_noise)';
+  %Equation (2) in paper 3
+    
+    
+    
     %U sjak være gravitasjonsvektor i sensorramma
     %frekvens skalering
     % u skal beskrive gravitasjonen
     % 10 ganger raskere viss vi ikke skalerer den
 
-    
-    
+    %Using dynamic dt
+    dt = wrench_ss_time(i) - wrench_ss_time(i-1); 
     
     % Prediction 
     %X(i, :)
     %X(i, :) = X(i-1, :); %+ B *u_k'; %Equation 5 for  Previous state propagated to next time step
     %The change in three forces is multiplyed withe the B vector. What will i get??
     %%Does this actually make any sence??
-    X(i, :) = (A*X(i-1, :)'+ B*u_k)';
+    X(i, :) = (A*X(i-1, :)' + B*u_k)';
     % X(i, :) = X(i-1, :)' + B_k * u_k;
-    P = P %+% Q_k;  % Equation 6 for updating the process covariance matrix
+    P = A*P*A' +  dt*Q_k;  % Equation 6 for updating the process covariance matrix
 
     % Measurement vector: Combine wrench and acceleration data
-    %Z = [baseline_wrench.fx(i); baseline_wrench.fy(i); baseline_wrench.fz(i); ...
-    %     baseline_wrench.tx(i); baseline_wrench.ty(i); baseline_wrench.tz(i); ...
-    %     baseline_accel.ax(i); baseline_accel.ay(i); baseline_accel.az(i)];
-
-    Z = [baseline_wrench.fx(i) - Vg(1);
+    %disp(i)
+    Z = [ax;
+     ay;
+     az;
+     baseline_wrench.fx(i) - Vg(1);
      baseline_wrench.fy(i) - Vg(2);
      baseline_wrench.fz(i) - Vg(3);
      baseline_wrench.tx(i) - Vg(4);
      baseline_wrench.ty(i) - Vg(5);
-     baseline_wrench.tz(i) - Vg(6);
-     baseline_accel.ax(i);
-     baseline_accel.ay(i);
-     baseline_accel.az(i);];
-
+     baseline_wrench.tz(i) - Vg(6)];
+     
     % Kalman gain: Use combined measurement noise covariance
-    K = P / (P + blkdiag(R_f, R_a));  % 9x9 %Equation 7
+    K = P * eye(9)' / (eye(9)*P*eye(9)' + blkdiag(R_f, R_a));  % 9x9 %Equation 7
 
-    disp("X(i, :)'");
-    disp(X(i, :)');
 
-    % Update step: Correct the predicted state with new measurements
-    X(i, :) = X(i, :)' + K * (Z - X(i, :)'); %Equation 8
+    % Correcting the predicted state with new measurements
+    X(i, :) = X(i, :)' + K * (z_k(i, :)' - X(i, :)'); %Equation 8
     
     % Update covariance matrix
     P = (eye(9) - K) * P; %Equation 9
     
+    %This is the estimation model:
+    
+    %h_c should be correct???
+    %estimation model in equation (22)
     zHat_cont(i, :) = (H_c * X(i, :)')';
 
 
@@ -280,10 +319,6 @@ estimated_tx = X(:, 7);
 estimated_ty = X(:, 8);
 estimated_tz = X(:, 9);
 
-
-baseline_wrench.fx(i); baseline_wrench.fy(i); baseline_wrench.fz(i); ...
-         baseline_wrench.tx(i); baseline_wrench.ty(i); baseline_wrench.tz(i); ...
-         baseline_accel.ax(i); baseline_accel.ay(i); baseline_accel.az(i)
 
 
 % %Plotting
@@ -368,18 +403,6 @@ plot(baseline_wrench.tz, 'k'); hold on;
 title('Torque (Baseline)');
 legend({'baseline wrench Tz'}, 'Location', 'southwest');
 hold off;
-
-
-
-
-%Estimated acceleration (Not a part of the project paper)
-%figure;
-%subplot(3,1,1);
-%plot(X(:, 1)); title('Estimated acceleration X (Baseline)');
-%subplot(3,1,2);
-%plot(X(:, 2)); title('Estimated acceleration Y (Baseline)');
-%subplot(3,1,3);
-%plot(X(:, 3)); title('Estimated acceleration Z (Baseline)');
 
 
 figure;
