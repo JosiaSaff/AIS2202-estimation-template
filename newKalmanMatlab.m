@@ -1,7 +1,8 @@
-clc, close all, clear all;
-% For the last task.
+%updated last time 06.11.2024hku
 
-% Load the FTS and IMU data
+clc, close all, clear all;
+
+
 FTS_data = readtable('datasets/0-calibration_fts-accel.csv');
 steady_state_accel = readtable('datasets/0-steady-state_accel.csv');
 steady_state_wrench = readtable('datasets/0-steady-state_wrench.csv');
@@ -101,13 +102,6 @@ R_fs = [0, -1, 0; 0, 0, 1; -1, 0, 0];
 % is very simular to the vector in the dataset:
 % baseline orientations
 
-
-%while excample 
-%while n > 1
-%    n = n-1;
-%    f = f*n;
-%end
-
 g_s = R_fs * g_w; 
 lastTrajectory = R_fs * g_w;
 
@@ -172,6 +166,9 @@ len_acc = length(baseline_accel.ax);
 X_f_t = [compensated_fx_baseline, compensated_fy_baseline, compensated_fz_baseline, compensated_tx_baseline, compensated_ty_baseline, compensated_tz_baseline];
 zHat_cont = zeros(n, 6);
 X_hat_est = zeros(n, 6);
+X_zeros = zeros(n, 9);
+X_k = [baseline_accel.ax(1), baseline_accel.ay(1), baseline_accel.az(1), compensated_fx_baseline(1), compensated_fy_baseline(1), compensated_fz_baseline(1), compensated_tx_baseline(1), compensated_ty_baseline(1), compensated_tz_baseline(1)]
+X_k_new = zeros(1, 9);
 X = zeros(n, 9);
 z_k = zeros(n, 9)
 % Initial state for forces and torques
@@ -194,12 +191,8 @@ R_f = [diag(variance_f_force), zeros(3,3); zeros(3,3) diag(variance_f_torque)];
 R_a = diag(variance_f_acceleration);
 
 B = [eye(3); estimated_mass*eye(3); estimated_mass*mass_center_screwsym];
-disp('B')
-disp(B)
-
 %D_k = zeros(size(B));
-D_k = 0.1 * [eye(3); zeros(3); zeros(3)];
-%D_k = diag([bias_fx, bias_fy, bias_fz, bias_tx, bias_ty, bias_tz]);
+D_k = 0.1 * [zeros(3); zeros(3); zeros(3)];
 
 % use change in the input and the oriantation matrix
 % g_w is the gravitational acceleration expressed in the world frame
@@ -221,12 +214,11 @@ for i = 2:n
     %sensor fusion
 
     while (wrench_ss_time(i) >  orientations_ss_time(orientations_ss_time_index)) & (orientations_ss_time_index < 627)
-        %makes sure to update the trajectory
-        orientations_ss_time_index = orientations_ss_time_index + 1; 
-        % g_s is gravitation vector in world frave 
+      
         deltaG_sk = ([orient_r11(orientations_ss_time_index), orient_r12(orientations_ss_time_index), orient_r13(orientations_ss_time_index); orient_r21(orientations_ss_time_index), orient_r22(orientations_ss_time_index), orient_r23(orientations_ss_time_index); orient_r31(orientations_ss_time_index), orient_r32(orientations_ss_time_index), orient_r33(orientations_ss_time_index)]*g_w - lastTrajectory);
         u_k = deltaG_sk * (fr / (ff + fa));
         lastTrajectory = [orient_r11(orientations_ss_time_index), orient_r12(orientations_ss_time_index), orient_r13(orientations_ss_time_index); orient_r21(orientations_ss_time_index), orient_r22(orientations_ss_time_index), orient_r23(orientations_ss_time_index); orient_r31(orientations_ss_time_index), orient_r32(orientations_ss_time_index), orient_r33(orientations_ss_time_index)]*g_w;
+        orientations_ss_time_index = orientations_ss_time_index + 1;  
     end 
 
     while (wrench_ss_time(i) >  baseline_accel.t(base_accel_index)) & (base_accel_index < 1593)
@@ -240,15 +232,9 @@ for i = 2:n
     
     
     u_k = deltaG_sk * (fr / (ff + fa));
-    %Measurements, or observations from the process, are related to the state vector as shown in (2)
-    %define gaussian noice
-    %gaussian_noise = std_dev * randn(size(u_k));
-    gaussian_noise = [std_ax, std_ay, std_az, std_fx, std_fy, std_fz, std_tx, std_ty, std_tz]' .* (randn(9, 1)/10);
-    %disp(H_k*u_k + B_K*u_k + [std_ax, std_ay; std_az; std_fx; std_fy; std_fz; std_tx; std_ty; std_tz] * randn(size(u_k)))
+    gaussian_noise = [std_ax, std_ay, std_az, std_fx, std_fy, std_fz, std_tx, std_ty, std_tz]' .* (randn(9, 1)/500)
     z_k(i, :) = (H_k*[ax,ay,az,X_f_t(i,:)]' + D_k*u_k + gaussian_noise)';
-  %Equation (2) in paper 3
-    
-    
+    %Equation (2) in paper 3
     
     %U sjak være gravitasjonsvektor i sensorramma
     %frekvens skalering
@@ -258,17 +244,13 @@ for i = 2:n
     %Using dynamic dt
     dt = wrench_ss_time(i) - wrench_ss_time(i-1); 
     
-    % Prediction 
-    %X(i, :)
-    %X(i, :) = X(i-1, :); %+ B *u_k'; %Equation 5 for  Previous state propagated to next time step
-    %The change in three forces is multiplyed withe the B vector. What will i get??
-    %%Does this actually make any sence??
-    X(i, :) = (A*X(i-1, :)' + B*u_k)';
-    % X(i, :) = X(i-1, :)' + B_k * u_k;
-    P = A*P*A' +  dt*Q_k;  % Equation 6 for updating the process covariance matrix
+    
+    X_k_new = (A*X_k' + B*u_k)';
+    
+    % Equation (6) for updating the process covariance matrix
+    P = A*P*A' +  dt*Q_k;  
 
-    % Measurement vector: Combine wrench and acceleration data
-    %disp(i)
+    % Measurement vector: Combine wrench and acceleration date
     Z = [ax;
      ay;
      az;
@@ -280,20 +262,21 @@ for i = 2:n
      baseline_wrench.tz(i) - Vg(6)];
      
     % Kalman gain: Use combined measurement noise covariance
-    K = P * eye(9)' / (eye(9)*P*eye(9)' + blkdiag(R_f, R_a));  % 9x9 %Equation 7
+    % Equation 7
+    K = P * eye(9)' / (eye(9)*P*eye(9)' + blkdiag(R_f, R_a));  
 
 
     % Correcting the predicted state with new measurements
-    X(i, :) = X(i, :)' + K * (z_k(i, :)' - X(i, :)'); %Equation 8
+    X_k = (X_k_new' + K * (z_k(i, :)' - H_k*X_k_new'))'; %Equation 8
     
     % Update covariance matrix
-    P = (eye(9) - K) * P; %Equation 9
+    P = (eye(9) - K*H_k) * P; %Equation 9
+
+    zHat_cont(i, :) = (H_c * [ax, ay, az, compensated_fx_baseline(i), compensated_fy_baseline(i), compensated_fz_baseline(i), compensated_tx_baseline(i), compensated_ty_baseline(i), compensated_tz_baseline(i)]');
     
-    %This is the estimation model:
     
-    %h_c should be correct???
-    %estimation model in equation (22)
-    zHat_cont(i, :) = (H_c * X(i, :)')';
+    %Just a vector for storing state for every iteration
+    X(i, :)= X_k;
 
 
 end
@@ -327,19 +310,19 @@ estimated_tz = X(:, 9);
 figure;
 subplot(3,1,1);
 plot(zHat_cont(:,1), 'r');
-title('Estimated Contact Force X');
+title('Estimated Contact Force X, Z^');
 xlabel('Time Step');
 ylabel('Force (N)');
 
 subplot(3,1,2);
 plot(zHat_cont(:,2), 'g');
-title('Estimated Contact Force Y');
+title('Estimated Contact Force Y, Z^');
 xlabel('Time Step');
 ylabel('Force (N)');
 
 subplot(3,1,3);
 plot(zHat_cont(:,3), 'b');
-title('Estimated Contact Force Z');
+title('Estimated Contact Force Z, Z^');
 xlabel('Time Step');
 ylabel('Force (N)');
 
@@ -347,19 +330,19 @@ ylabel('Force (N)');
 figure;
 subplot(3,1,1);
 plot(zHat_cont(:,4), 'c');
-title('Estimated Contact Torque X');
+title('Estimated Contact Torque X, Z^');
 xlabel('Time Step');
 ylabel('Torque (Nm)');
 
 subplot(3,1,2);
 plot(zHat_cont(:,5), 'm');
-title('Estimated Contact Torque Y');
+title('Estimated Contact Torque Y, Z^');
 xlabel('Time Step');
 ylabel('Torque (Nm)');
 
 subplot(3,1,3);
 plot(zHat_cont(:,6), 'k');
-title('Estimated Contact Torque Z');
+title('Estimated Contact Torque Z, Z^');
 xlabel('Time Step');
 ylabel('Torque (Nm)');
 
