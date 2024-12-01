@@ -38,12 +38,6 @@ classdef KalmanFilter
         % Initial state for
     end
     
-    %The contact wrench (force and torque) between the robot and the environment can be estimated by subtracting
-        %(1) the wrench arising from from gravity, (2) the robot motion, and (3) vibrations from the unbiased FTS
-    %measurements.
-    %Task: Once the biases have been estimated, they must be subtracted from all subsequent sensor measurement samples.
-    %For the FTS samples, the bias must be subtracted from the samples prior to mass and mass center estimation.
-
     methods %ForceTorqueBias is [9.07633; -1.01814;  9.98482; 0.432449; -0.692162; -0.156746;]
         function obj = KalmanFilter(nStates, mass, massCenterScrewsym, ...
                 frcTorquBias, massCenter, datasetAccel, datasetForceTorqu, gaussionNoiArray, varianceVec)
@@ -96,9 +90,7 @@ classdef KalmanFilter
             
             obj.Q = [eye(3), zeros(3), zeros(3);
                     zeros(3), mass*eye(3), zeros(3);
-                    zeros(3), zeros(3), mass*norm(massCenter)*eye(3)]; %9x9 matrix
-            
-            % = eye(measurement_dim);
+                    zeros(3), zeros(3), mass*norm(massCenter)*eye(3)]; 
             
             obj.P = eye(9);
 
@@ -127,16 +119,10 @@ classdef KalmanFilter
             
             %Kalman gain 
             K = obj.P * obj.H' / (obj.H * obj.P * obj.H' + diag(obj.dataVariance)); % Kalman gain
-                                                            %might have to
-                                                            %do Rk
-                                                            %differently
-
-            
-
-            %WHRONG Z is being used here.
+                                                        
         
           
-            %tuning by using the H matrix
+       
             obj.state = (obj.XStateNew' + K * (obj.zk' - obj.H * obj.XStateNew'))';
           
 
@@ -166,7 +152,7 @@ classdef KalmanFilter
 
             figure;
             %plot((obj.zHatAll(:, 3) - obj.forceBias(3) - obj.Vg(3)), 'b-', 'DisplayName', 'z^3'); % Plot z^3
-            plot((obj.covariances), 'b-', 'DisplayName', 'det(Q_k)'); % Plot z^3
+            plot((obj.covariances), 'b-', 'DisplayName', 'det(Q_k)'); % 
             hold on;
             xline(1000, '--r', 'DisplayName', 'Iteration  = 1000');
             hold off;
