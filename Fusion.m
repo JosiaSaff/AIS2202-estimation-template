@@ -1,21 +1,18 @@
-
 classdef Fusion
     properties
         kalmanFilter % Kalman Instance
         mass 
-        mass_center % Mass center of the system
-        gravityVec % Gravity vector
-        Rfs % Rotation matrix from IMU to FTS frame
-        
+        massCenter 
+        gravityVec 
+        Rfs 
+        mass_center_skew
 
         %This is Biases
         Vg
         forceBias
         torqueBias
 
-        
-        
-        % measurement matrices
+        %matrices for measurements 
         H_a 
         H_f
         H_c 
@@ -24,6 +21,9 @@ classdef Fusion
         fr
         fa
         ff
+
+        inputMatrixf3
+        inputMatrixt2
 
         %wrenchDataset
 
@@ -40,10 +40,10 @@ classdef Fusion
         
         
         
-        function obj = setupStateSpace(obj, mass, mass_center, Rfs, gravityVec, n, forceBias, torqueBias, Vg)
+        function obj = setupStateSpace(obj, mass, massCenter, Rfs, gravityVec, n, forceBias, torqueBias, Vg)
             % Setup state-space model
             obj.mass = mass;
-            obj.mass_center = mass_center;
+            obj.massCenter = massCenter;
             obj.gravityVec = gravityVec;
             obj.Rfs = Rfs;
             
@@ -51,16 +51,19 @@ classdef Fusion
             obj.H_f = [zeros(3), eye(3), zeros(3);
                        zeros(3, 6), eye(3)];
             
-            mass_center_skew = [0, -mass_center(3), mass_center(2);
-                                mass_center(3), 0, -mass_center(1);
-                                -mass_center(2), mass_center(1), 0];
+            obj.mass_center_skew = [0, -massCenter(3), massCenter(2);
+                                massCenter(3), 0, -massCenter(1);
+                                -massCenter(2), massCenter(1), 0];
             
-            obj.H_c = [-mass * eye(3), eye(3), zeros(3);
-                       -mass * mass_center_skew, zeros(3), eye(3)];
+            obj.H_c = [-(mass *eye(3)), eye(3), zeros(3);
+                       -(mass * obj.mass_center_skew), zeros(3), eye(3)];
             
             obj.fr = 100.2;
             obj.fa = 254.3;
             obj.ff = 698.3;
+
+            obj.inputMatrixf3 = zeros(n,1);
+            obj.inputMatrixt2 = zeros(n,1);
 
             obj.zHatAll = zeros(n, 6); 
             obj.xHatAll = zeros(n, 9); 
@@ -93,23 +96,14 @@ classdef Fusion
 
 
             deltaG_sk = ([orien.r11(orientationsDatasetIndex), orien.r12(orientationsDatasetIndex), orien.r13(orientationsDatasetIndex); orien.r21(orientationsDatasetIndex), orien.r22(orientationsDatasetIndex), orien.r23(orientationsDatasetIndex); orien.r31(orientationsDatasetIndex), orien.r32(orientationsDatasetIndex), orien.r33(orientationsDatasetIndex)]*obj.gravityVec - lastTrajectory);
-            disp("deltaG_sk")
-            disp(deltaG_sk)
+            
             
 
             obj.Rfs = [orien.r11(orientationsDatasetIndex), orien.r12(orientationsDatasetIndex), orien.r13(orientationsDatasetIndex);
                      orien.r21(orientationsDatasetIndex), orien.r22(orientationsDatasetIndex), orien.r23(orientationsDatasetIndex);
                      orien.r31(orientationsDatasetIndex), orien.r32(orientationsDatasetIndex), orien.r33(orientationsDatasetIndex)];
-            u_k = deltaG_sk * (obj.fr / (obj.ff + obj.fa));
-            disp("u_k:")
-            disp(u_k)
-            
-            
-            disp(obj.gravityVec)
-            disp("obj.gravityVec")
-            disp("obj.gravityVec")
-
-            %obj.wrenchDataset = wrenchDataset;
+            u_k = -deltaG_sk * (obj.fr / (obj.ff + obj.fa));
+           
 
             for i = 2:n
 
@@ -141,6 +135,7 @@ classdef Fusion
                     az = accelDataset.az(accelDatasetIndex);%*- 9.81;
             
                     %accelVec = [ax; ay; az];
+                    obj.Vg = [[];[]];
                 end 
             
                            
@@ -157,7 +152,7 @@ classdef Fusion
                 dt = wrenchDataset.t(i) - wrenchDataset.t(i-1); 
 
 
-                currentStateVec = [[ax; ay; az]*9.81;...
+                currentStateVec = [[ax; ay; az];...
                     wrenchDataset.fx(i); wrenchDataset.fy(i); wrenchDataset.fz(i); ...
                     wrenchDataset.tx(i); wrenchDataset.ty(i); wrenchDataset.tz(i)];
 
@@ -177,42 +172,35 @@ classdef Fusion
                 currentState = obj.kalmanFilter.state;
              
 
-                
-                %z_hat_k = (obj.H_c * [[ax; ay; az]; ...
-                %    wrenchDataset.fx(i); wrenchDataset.fy(i); wrenchDataset.fz(i); ...
-                %    wrenchDataset.tx(i); wrenchDataset.ty(i); wrenchDataset.tz(i)]);
-                
+       
 
 
-                z_hat_k = (obj.H_c * (diag([[1, 1, 1], [1, 1, 1], [1, 1, 1]])*(currentState')));%/9.81));
-                %[[ax; ay; az]; ...
-                %    wrenchDataset.fx(i); wrenchDataset.fy(i); wrenchDataset.fz(i); ...
-                %    wrenchDataset.tx(i); wrenchDataset.ty(i); wrenchDataset.tz(i)]);
+                z_hat_k = (obj.H_c * (diag([9.81*[1, 1, 1], [1, 1, 1], [1, 1, 1]])*(currentState')));%/9.81));
+                
                
-            
-                disp('z_hat_k')
-                disp('z_hat_k')
-                disp(z_hat_k)
+                
 
+                %Storing the data for plotting later
+                
                 obj.zHatAll(i, :) =  z_hat_k';
 
-                disp('obj.kalmanFilter.state')
-                disp('Collected this cockhead obj.kalmanFilter.state')
-                disp('obj.kalmanFilter.state')
+               
 
                 obj.xHatAll(i, :) = obj.kalmanFilter.state'; 
                 obj.xHatAll(i, :) = currentState'; 
+                inputBu = ([eye(3); obj.mass*eye(3); obj.mass*obj.mass_center_skew]*u_k);
+                obj.inputMatrixf3(i) = (inputBu(6)) + obj.inputMatrixf3(i-1);
+                obj.inputMatrixt2(i) = (inputBu(8)) + obj.inputMatrixt2(i-1);
 
 
-                % Output estimated state
-                %disp(['Step ', num2str(i), ': Estimated State = ', num2str(obj.kalmanFilter.state')]);
+             
             end
             
-
-            
+           
         
             %Calling the plotting function
             plot(obj,wrenchDataset)
+            obj.kalmanFilter.plotKnQ()
 
 
 
@@ -220,10 +208,13 @@ classdef Fusion
         function plot(obj, wrenchDataset)
             % Plot z^3, x_6, and Force f_3, ensuring xHatAll is plotted last
             figure;
-            plot((obj.zHatAll(:, 3) - obj.forceBias(3) - obj.Vg(3)), 'b-', 'DisplayName', 'z^3'); % Plot z^3
+ 
+            plot((obj.zHatAll(:, 3)), 'b-', 'DisplayName', 'z^3'); % Plot z^3
             hold on;
-            plot((wrenchDataset.fz - obj.forceBias(3) - obj.Vg(3)), 'g-.', 'DisplayName', 'Force f_3'); 
-            plot((obj.xHatAll(:, 6) - obj.forceBias(3) - obj.Vg(3)), 'r--', 'LineWidth', 1.2, 'DisplayName', 'x_6');
+         
+            plot((wrenchDataset.fz), 'g-.', 'DisplayName', 'Force f_3'); 
+            plot((obj.xHatAll(:, 6)), 'r--', 'LineWidth', 1.2, 'DisplayName', 'x_6');
+            %plot((obj.xHatAll(:, 3)), 'o--', 'LineWidth', 1.2, 'DisplayName', 'a_3');
             hold off;
             title('z^3, x_6, and Force f_3');
             xlabel('Time Step');
@@ -234,16 +225,46 @@ classdef Fusion
             
             figure;
             %plot((obj.zHatAll(:, 5) - obj.torqueBias(2) - obj.Vg(5)), 'b-', 'DisplayName', 'z^5');
-            plot((obj.zHatAll(:, 5) - obj.Vg(5)), 'b-', 'DisplayName', 'z^5');
+            plot((obj.zHatAll(:, 5)), 'b-', 'DisplayName', 'z^5');
             hold on;
-            plot((wrenchDataset.ty - obj.torqueBias(2) - obj.Vg(5)), 'g-.', 'DisplayName', 'Torque t_2'); 
-            plot((obj.xHatAll(:, 8) - obj.torqueBias(2) - obj.Vg(5)), 'r--', 'LineWidth', 1.2, 'DisplayName', 'x_8');
+       
+            plot((wrenchDataset.ty), 'g-.', 'DisplayName', 'Torque t_2'); 
+            plot((obj.xHatAll(:, 8)), 'r--', 'LineWidth', 1.2, 'DisplayName', 'x_8');
+            %plot((obj.xHatAll(:, 2)), 'o--', 'LineWidth', 1.2, 'DisplayName', 'a_2');
             hold off;
             title('z^5, x_8, and Torque t_2');
             xlabel('Iteration');
             ylabel('Value');
-            legend('show'); % Show legend
+            legend('show'); 
             grid on;
+
+
+            figure;
+            %plot((obj.zHatAll(:, 3) - obj.forceBias(3) - obj.Vg(3)), 'b-', 'DisplayName', 'z^3'); % Plot z^3
+            plot((obj.inputMatrixf3), 'b-', 'DisplayName', 'u for f3 estimation'); % Plot z^3
+            hold on;
+            hold off;
+            title('integrated input u');
+            xlabel('Time Step');
+            ylabel('Value');
+            legend('show'); 
+            grid on;
+
+
+            figure;
+            %plot((obj.zHatAll(:, 3) - obj.forceBias(3) - obj.Vg(3)), 'b-', 'DisplayName', 'z^3'); % Plot z^3
+            plot((obj.inputMatrixt2), 'b-', 'DisplayName', 'u for t2 estimation'); % Plot z^3
+            hold on;
+            hold off;
+            title('integrated input u');
+            xlabel('Time Step');
+            ylabel('Value');
+            legend('show'); 
+            grid on;
+
+            
+
+           
 
 
         end
