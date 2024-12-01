@@ -4,24 +4,36 @@ classdef KalmanFilter
     properties
         A % State transition matrix
         B % Input
-        Dk % input
-        H % Measurement
-        Q % Covariance Process noise
-        Rk % Measurement noise covariance
-        P % Covariance of the state estimate
+        Dk 
+        H 
+        Q 
+        % Measurement noise covariance:
+        Rk 
+        % Covariance of the state estimate:
+        P 
         
         biasForcTorque
 
         gaussianNoice
-
+        processVariance
         % State estimate
         %initialized as state for the first iteration
         state 
         dataVariance
+        process
         XstateFull 
         XStateNew
         X
         zk
+        iterations
+        iteration
+
+        %lists for storing values for plotting/studying later
+        kalmanGains
+        covariances
+
+
+      
        
         % Initial state for
     end
@@ -38,32 +50,25 @@ classdef KalmanFilter
                         %Adding the two new ones, gaussiannoice and initial
                         
             
-            %obj.XStateFull = zeros(stateDim, 9);
-            
-
-
-            %commented out 27.11.2024
-            %datasetAccel.ax = datasetAccel.ax * -9.81;
-            %datasetAccel.ay = datasetAccel.ay * -9.81;
-            %datasetAccel.az = datasetAccel.az * -9.81;
-
-            %varAccelAx = var(datasetAccel.ax); %defently the wrong data.
-            %varAccelAy = var(datasetAccel.ay); % porbably baseline
-            %varAccelAz = var(datasetAccel.az);
+     
 
             obj.dataVariance = varianceVec;
-            disp('This is the variance Vec:')
-            disp(obj.dataVariance)
+            
+            obj.iteration = 1;
 
+            obj.iterations = length(datasetForceTorqu.fx);
 
+            obj.kalmanGains = zeros(obj.iterations,1);
+            obj.covariances = zeros(obj.iterations,1);
+
+            obj.processVariance = 0.5;
 
             obj.XStateNew = zeros(1, 9);
-            %Initializing the state for the beginning
+            %Initializing the state for the first iteration
             obj.state = [datasetAccel.ax(1), datasetAccel.ay(1), datasetAccel.az(1),...
                 datasetForceTorqu.fx(1), datasetForceTorqu.fy(1), datasetForceTorqu.fz(1),...
                 datasetForceTorqu.tx(1), datasetForceTorqu.ty(1), datasetForceTorqu.tz(1)];
-            disp('This is the state of')
-            disp(obj.state)
+            
 
             obj.A = eye(9);
 
@@ -73,16 +78,16 @@ classdef KalmanFilter
             
             obj.B = [eye(3); mass*eye(3); mass*massCenterScrewsym];
             
-            obj.Dk = 0.1 * [zeros(3); zeros(3); zeros(3)];
+            obj.Dk = [zeros(3); zeros(3); zeros(3)];
 
             
             %For the report, we mostly care about the y and the z
             %force/torque
-            tunedAccel = [1, 1/100, 1/1];
+            tunedAccel = [1/1, 1/100, 1/100];
 
-            tunedforce = [1, 1/10000, 1/500]; 
+            tunedforce = [-1, 1/20000, 1/10000]; 
 
-            tunedTorque = [1, 1/500, 1/1];
+            tunedTorque = [-1, 1/1, 1/1];
 
 
 
@@ -105,21 +110,16 @@ classdef KalmanFilter
         
         function obj = predict(obj, u, dt, currentStateVec)
 
-            obj.zk = (obj.H* currentStateVec + (obj.Dk * u) + obj.gaussianNoice' .* (randn(9, 1)/1000))';
+            obj.zk = (obj.H* currentStateVec + (obj.Dk * u) +obj.gaussianNoice' .* randn(9, 1)/70)';
             obj.XStateNew = (obj.A * obj.state' + obj.B * u)';
-            obj.P = obj.A * obj.P * obj.A' + dt*obj.Q;
-            disp('output P')
-            disp(obj.P)
-            disp('OutputXStateNew')
-            disp(obj.P)
+            obj.P = obj.A * obj.P * obj.A' + dt*(obj.Q*obj.processVariance);
+          
         end
         
         function obj = update(obj)
 
-            disp('input P')
-            disp(obj.P)
-            disp('input XStateNew')
-            disp(obj.P)
+            
+
             % Update step
             %Only place where Rk is used
 
@@ -135,20 +135,65 @@ classdef KalmanFilter
 
             %WHRONG Z is being used here.
         
-            disp('This is the kalman filter stateBefore:')
-            disp('This is the kalman filter state before:')
-            disp(obj.XStateNew)
+          
             %tuning by using the H matrix
             obj.state = (obj.XStateNew' + K * (obj.zk' - obj.H * obj.XStateNew'))';
-            disp('This is the kalman filter state:')
-            disp('This is the kalman filter state:')
-            disp(obj.state)
+          
 
             %updating covariance matrice for the next iteration
             obj.P = (eye(9) - K * obj.H) * obj.P;
+      
+            
+            isDiagonal = isequal(obj.P, diag(diag(obj.P)));
+
+            if isDiagonal
+                
+            else
+                disp('The matrix is not diagonal.');
+            end
+
+            obj.kalmanGains(obj.iteration) = det(K);
+            obj.covariances(obj.iteration) = det(obj.P);
+
+            obj.iteration = obj.iteration + 1;
 
             
         end
+
+        function obj = plotKnQ(obj)
+
+            
+
+            figure;
+            %plot((obj.zHatAll(:, 3) - obj.forceBias(3) - obj.Vg(3)), 'b-', 'DisplayName', 'z^3'); % Plot z^3
+            plot((obj.covariances), 'b-', 'DisplayName', 'det(Q_k)'); % Plot z^3
+            hold on;
+            xline(1000, '--r', 'DisplayName', 'Iteration  = 1000');
+            hold off;
+            title('Determinant of covariance matices');
+            xlabel('Time Step');
+            ylabel('Value');
+            legend('show'); % Show legend
+            grid on;
+            
+            
+            figure;
+            %plot((obj.zHatAll(:, 5) - obj.torqueBias(2) - obj.Vg(5)), 'b-', 'DisplayName', 'z^5');
+            plot((obj.kalmanGains), 'b-', 'DisplayName', 'k_k');
+            hold on;
+            xline(1000, '--r', 'DisplayName', 'Iteration  = 1000');
+            hold off;
+            title('Kalman gains per iteration');
+            xlabel('Iteration');
+            ylabel('Value');
+            legend('show'); % Show legend
+            grid on;
+
+
+            
+        end
+
+        
         
    
     end
