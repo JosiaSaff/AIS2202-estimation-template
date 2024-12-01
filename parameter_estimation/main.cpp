@@ -41,7 +41,7 @@ Eigen::MatrixXd estimateMassCenter(const Eigen::MatrixXd &gravityVecs, const Eig
 
     for (int i = 1; i < row; ++i) {
         Eigen::Matrix3d gravityMatrix;
-        gravityMatrix <<  0, -gravityVecs(i, 2), gravityVecs(i, 1),
+        gravityMatrix <<  0, -gravityVecs(i, 2), gravityVecs(i, 1), //screwSymetric gravity matrix
                 gravityVecs(i, 2), 0, -gravityVecs(i, 0),
                 -gravityVecs(i, 1), gravityVecs(i, 0), 0;
 
@@ -77,6 +77,9 @@ Eigen::MatrixXd estimateMassCenter(const Eigen::MatrixXd &gravityVecs, const Eig
 
 
     const std::string filePath = "..\\datasets\\0-calibration_fts-accel.csv";
+
+
+    //Data collection inspired from: "https://www.geeksforgeeks.org/how-to-read-data-from-csv-file-to-a-2d-array-in-cpp/"
 
     int main() {
 

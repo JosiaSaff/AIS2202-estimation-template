@@ -23,7 +23,6 @@ Eigen::Vector3d massCenter(0.0, 0.0, 0.044);
 //Sensor Bias
 Eigen::Vector3d ftsBias(9.07633, -1.01814, 9.98482);
 
-//IMU Bias
 Eigen::Vector3d imuBias(-0.00366194, 0.00884945, 0.0771078);
 
 

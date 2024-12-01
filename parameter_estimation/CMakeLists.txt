@@ -9,7 +9,7 @@
 find_package(Eigen3 CONFIG REQUIRED)
 find_path(RAPIDCSV_INCLUDE_DIRS "rapidcsv.h")
 
-add_executable(stateEstimation main.cpp)
+add_executable(parameter_Estimation main.cpp)
 
-target_link_libraries(stateEstimation PUBLIC Eigen3::Eigen estimation)
-target_include_directories(stateEstimation PRIVATE ${RAPIDCSV_INCLUDE_DIRS})
+target_link_libraries(parameter_Estimation PUBLIC Eigen3::Eigen estimation)
+target_include_directories(parameter_Estimation PRIVATE ${RAPIDCSV_INCLUDE_DIRS})
